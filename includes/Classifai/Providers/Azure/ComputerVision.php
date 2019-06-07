@@ -60,8 +60,29 @@ class ComputerVision extends Provider {
 	 */
 	public function generate_alt_tags( $metadata, $attachment_id ) {
 		$threshold = $this->get_settings( 'caption_threshold' );
+		$image_url = '';
+		$filesize = filesize( get_attached_file( $attachment_id ) );
 
-		$image_url = wp_get_attachment_image_url( $attachment_id );
+		if ( $filesize < ( MB_IN_BYTES * 4 ) ) {
+			$image_url = wp_get_attachment_image_url( $attachment_id );
+		} elseif ( ! empty( $metadata['sizes']['large'] ) ) {
+			// Try the large image size - if this isn't under 4MB for some reason then don't bother cycling through the rest.
+			$large_image = image_get_intermediate_size( $attachment_id, 'large' );
+
+			if ( ! empty( $large_image['path'] ) ) {
+				$filesize = filesize( $large_image['path'] );
+
+				if ( $filesize < ( MB_IN_BYTES * 4 ) ) {
+					$image_url = $large_image['url'];
+				}
+			}
+		}
+
+		// Bail early if we still don't have an image URL
+		if ( empty( $image_url ) ) {
+			return $metadata;
+		}
+
 		$captions  = $this->scan_image( $image_url );
 		if ( ! is_wp_error( $captions ) && isset( $captions[0] ) ) {
 			// Save the first caption as the alt text if it passes the threshold.
